@@ -3,14 +3,18 @@ module IntegralsExt
 using LinearAlgebra
 using Integrals
 using AuxQuad
-import AuxQuad:AuxQuadGK
+using AuxQuad: Sequential
+import AuxQuad: AuxQuadGK
 
-struct AuxQuadGKJL{F,S} <: SciMLBase.AbstractIntegralAlgorithm
+struct AuxQuadGKJL{F,S,P} <: SciMLBase.AbstractIntegralAlgorithm
     order::Int
     norm::F
     segbuf::S
+    parallel::P
 end
-AuxQuadGK(; order = 7, norm = norm, segbuf = nothing) = AuxQuadGKJL(order, norm, segbuf)
+function AuxQuadGK(; order = 7, norm = norm, segbuf = nothing, parallel = Sequential())
+    AuxQuadGKJL(order, norm, segbuf, parallel)
+end
 
 function Integrals.__solvebp_call(prob::IntegralProblem, alg::AuxQuadGKJL, sensealg, lb, ub, p;
                         reltol = 1e-8, abstol = 1e-8,
@@ -22,7 +26,7 @@ function Integrals.__solvebp_call(prob::IntegralProblem, alg::AuxQuadGKJL, sense
     @assert prob.nout == 1
     p = p
     f = x -> prob.f(x, p)
-    val, err = auxquadgk(f, lb, ub,
+    val, err = auxquadgk(f, lb, ub, parallel = alg.parallel,
                       rtol = reltol, atol = abstol, order = alg.order, norm = alg.norm, segbuf=alg.segbuf)
     SciMLBase.build_solution(prob, AuxQuadGK(), val, err, retcode = ReturnCode.Success)
 end
